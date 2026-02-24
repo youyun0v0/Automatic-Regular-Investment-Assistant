@@ -1,10 +1,10 @@
 name: Daily Nasdaq Alert
 
-on:
+于:
   schedule:
     # 每天北京时间 14:30 运行 (UTC 06:30)
     # 建议只在周一到周五运行，改为: '30 6 * * 1-5'
-    - cron: '30 6 * * 1-5'
+    - cron: '7 6 * * 1-5'
   workflow_dispatch: # 允许手动点按钮触发测试
 
 jobs:
