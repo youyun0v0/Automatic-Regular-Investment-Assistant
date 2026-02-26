@@ -8,7 +8,8 @@ import math
 # --- 配置区 ---
 WEBHOOK_URL = os.environ.get("WECHAT_WEBHOOK_URL", "")
 
-TARGETS = [
+TARGETS =[
+    # 1. 美股成长 (进攻)
     {
         "name": "纳指100 (QQQ)",
         "symbol": "QQQ",
@@ -17,6 +18,16 @@ TARGETS = [
         "currency": "$",
         "thresholds": {"low": 0, "deep_low": -15, "high": 20},
     },
+    # 2. 美股大盘 (稳健底仓) - 替换了原来的沪深300
+    {
+        "name": "标普500 (SPY)",
+        "symbol": "SPY", 
+        "backup_symbol": "VOO", 
+        "type": "stock_us",
+        "currency": "$",
+        "thresholds": {"low": 0, "deep_low": -10, "high": 15}, # 波动率小于纳指，阈值收窄
+    },
+    # 3. 全球避险 (防守)
     {
         "name": "国泰黄金 (004253)",
         "symbol": "GC=F", 
@@ -25,14 +36,7 @@ TARGETS = [
         "currency": "$",
         "thresholds": {"low": 2, "deep_low": -5, "high": 15},
     },
-    {
-        "name": "沪深300 (A股大盘)", 
-        "symbol": "000300.SS",  
-        "backup_symbol": "ASHR", 
-        "type": "stock_cn_value", 
-        "currency": "¥",
-        "thresholds": {"low": -5, "deep_low": -15, "high": 10},
-    },
+    # 4. A股高弹性 (激进)
     {
         "name": "创业板指 (399006)", 
         "symbol": "399006.SZ",  
@@ -112,16 +116,16 @@ def get_data_and_calc(target):
         
         display_price = df_current_price
 
-        # 2. 【核心修复】A股强制实时覆盖 (无视是否使用了备胎)
+        # 2. A股强制实时覆盖 (无视是否使用了备胎)
         if 'cn' in target['type']:
-            rt_data = get_tencent_realtime(target['symbol']) # 永远用原始代码去查腾讯
+            rt_data = get_tencent_realtime(target['symbol']) 
             if rt_data:
                 rt_price, rt_change = rt_data
-                display_price = rt_price   # 强制覆盖为腾讯的实时价格
-                daily_change = rt_change   # 强制覆盖为腾讯的实时涨跌幅
+                display_price = rt_price   
+                daily_change = rt_change   
                 print(f"  -> ⚡ 成功强制覆盖国内实时行情: {rt_price}, {round(rt_change, 2)}%")
                 
-                # 只有在没用备胎的情况下，才用实时价格重算乖离率 (因为备胎的价格是美元，不能和人民币混算)
+                # 只有在没用备胎的情况下，才用实时价格重算乖离率
                 if not used_backup:
                     bias = (rt_price - ma250) / ma250 * 100
                     drawdown = (rt_price - high_250) / high_250 * 100
@@ -152,6 +156,7 @@ def generate_advice(data):
     advice = ""
     level = "normal"
     
+    # 黄金策略
     if t['type'] == 'gold':
         if bias < th['deep_low']: 
             advice = "💎 **极度低估**：罕见机会，建议 **2.0倍 囤货**"
@@ -168,23 +173,7 @@ def generate_advice(data):
         else:
             advice = "😐 **趋势向上**：建议 **正常定投**"
 
-    elif t['type'] == 'stock_cn_value':
-        if bias < th['deep_low']: 
-            advice = "🇨🇳 **遍地黄金**：极度低估，建议 **3.0倍 大额买入**"
-            level = "opportunity"
-        elif bias < th['low']:    
-            advice = "💰 **低估区间**：市场便宜，建议 **1.5倍 耐心定投**"
-            level = "opportunity"
-        elif bias > th['high']:   
-            advice = "🚀 **情绪高涨**：建议 **止盈 或 暂停**"
-            level = "risk"
-        elif bias > 0:
-            advice = "😐 **右侧浮盈**：建议 **正常定投**"
-            level = "normal"
-        else:
-            advice = "🐢 **磨底震荡**：建议 **1.0倍 坚持**"
-            level = "normal"
-
+    # A股成长策略
     elif t['type'] == 'stock_cn_growth':
         if bias < th['deep_low']: 
             advice = "⚡ **血流成河**：崩盘下跌，建议 **4.0倍 极限抄底**"
@@ -202,6 +191,7 @@ def generate_advice(data):
             advice = "🎲 **高波震荡**：看不清方向，建议 **少投 或 观望**"
             level = "normal"
 
+    # 美股策略 (纳指 & 标普通用)
     else: 
         if bias < th['deep_low']: 
             advice = "💎 **钻石坑**：极度贪婪时刻，建议 **3倍 梭哈**"
@@ -240,10 +230,8 @@ def get_pretty_strategy_text():
         elif 'gold' in t_type:
             text += f"- 💎 **极度低估**: 偏离 < {th['deep_low']}% (2倍囤货)\n"
             text += f"- 🔥 **短期过热**: 偏离 > {th['high']}% (暂停买入)\n"
-        elif 'value' in t_type:
-            text += f"- 🇨🇳 **遍地黄金**: 偏离 < {th['deep_low']}% (3倍大额)\n"
-            text += f"- 🚀 **情绪高涨**: 偏离 > {th['high']}% (止盈/暂停)\n"
         else:
+            # 纳指、标普通用文案
             text += f"- 💎 **钻石坑位**: 偏离 < {th['deep_low']}% (3倍梭哈)\n"
             text += f"- 🚫 **极度过热**: 偏离 > {th['high']}% (止盈/观望)\n"
         text += "\n"
@@ -299,11 +287,4 @@ def send_combined_notification(results):
         print(markdown_content)
 
 if __name__ == "__main__":
-    results = []
-    print("🚀 启动分析...")
-    for target in TARGETS:
-        data = get_data_and_calc(target)
-        if data: results.append(data)
-    
-    send_combined_notification(results)
-    print("🏁 结束")
+    results =
