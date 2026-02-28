@@ -2,10 +2,12 @@ name: Daily Global Investment Alert
 
 on:
   schedule:
-    # 设定在 UTC 时间 06:15 (北京时间 14:15)
-    # 1-5 代表仅在周一到周五 (工作日) 运行
-    - cron: '15 6 * * 1-5'
-  workflow_dispatch: # 保留手动触发按钮，方便随时测试
+    # 🕒 改为：UTC时间 05:45 (即北京时间 13:45)
+    # 提前45分钟触发，专门用来对抗 GitHub 的排队延迟
+    # 1-5 代表周一到周五运行
+    - cron: '45 5 * * 1-5'
+    
+  workflow_dispatch: # 保留手动按钮
 
 jobs:
   build:
